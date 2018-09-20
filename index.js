@@ -189,6 +189,33 @@ const compilerOptions = Object.assign(tsConfig.compilerOptions, {
   inlineSources: true,
 })
 
+function loadTransformStep(name) {
+  const transformers = tsConfig.transformers || {};
+  return transformers[name] || [];
+}
+
+function loadTransformer(name) {
+  const mod = require(name);
+  if(typeof mod.getTransformer === 'function') {
+    return mod.getTransformer();
+  }
+
+  if(typeof mod.transform === 'function') {
+    return mod.transform();
+  }
+
+  if(typeof mod.default === 'function') {
+    return mod.default();
+  }
+
+  return mod;
+}
+
+const transformers = {
+  before: loadTransformStep('before').map(loadTransformer),
+  after: loadTransformStep('after').map(loadTransformer),
+};
+
 module.exports.getCacheKey = function() {
   const upstreamCacheKey = upstreamTransformer.getCacheKey
     ? upstreamTransformer.getCacheKey()
@@ -211,6 +238,7 @@ module.exports.transform = function(src, filename, options) {
       compilerOptions,
       fileName: filename,
       reportDiagnostics: true,
+      transformers,
     })
 
     const errors = tsCompileResult.diagnostics.filter(
